@@ -8,7 +8,7 @@ alphas=cell(1,T-1);
 betas=cell(1,T-1);
 
 for t=1:T-1
-    alphas{1,t}=-(10)^(5);
+    alphas{1,t}=-(10)^(10);
     betas{1,t}=zeros(1,n);
 end
 
@@ -57,7 +57,7 @@ while End_Algo
             model.A(1,:)=-ones(1,n);
             model.A(2,:)=ones(1,n);
             model.lb=zeros(n,1);
-            model.ub=1*ones(n,1);
+            model.ub=ones(n,1);
         else
             model.rhs=[-1;1;alphas{1,t}];
             model.A=sparse(2+iter,n+1);
@@ -68,7 +68,7 @@ while End_Algo
                 model.A(i+2,2:n+1)=-betas{1,t}(i,:);
             end
             model.lb=[-Inf;zeros(n,1)];
-            model.ub=[Inf;1*ones(n,1)];
+            model.ub=[Inf;ones(n,1)];
         end
         model.sense='>';
         %model.modelsense=1;
@@ -103,14 +103,14 @@ while End_Algo
     %Backward pass
     
     for t=T:-1:2
+        %min 0.5*trial_states{1,t-1}'*A*trial_states{1,t-1}+x'*C*trial_states{1,t-1}+0.5*x'*B*x
+        %x_t > = 0, \sum_i x_t(i)=1,
+        %theta e >= \alpha_{1,t}-betas{1,t}x_t for t<T
+        %Dec variable y_t=(theta,x_t) for t<T y_t=x_t for t=T
         if (t==T)
             intercept=0;
             slope=zeros(n,1);
             for j=1:M
-                %min 0.5*trial_states{1,t-1}'*A*trial_states{1,t-1}+x'*C*trial_states{1,t-1}+0.5*x'*B*x
-                %x_t > = 0, \sum_i x_t(i)=1,
-                %theta e >= \alpha_{1,t}-betas{1,t}x_t for t<T
-                %Dec variable y_t=(theta,x_t) y_t=x_t for t=T
                 A=sampleXsi{1,t}(j,1:n)'*sampleXsi{1,t}(j,1:n)+lambda*eye(n);
                 B=sampleXsi{1,t}(j,n+1:2*n)'*sampleXsi{1,t}(j,n+1:2*n)+lambda*eye(n);
                 C=sampleXsi{1,t}(j,n+1:2*n)'*sampleXsi{1,t}(j,1:n);
@@ -121,13 +121,13 @@ while End_Algo
                 model.A(1,:)=-ones(1,n);
                 model.A(2,:)=ones(1,n);
                 model.lb=zeros(n,1);
-                model.ub=1*ones(n,1);
+                model.ub=ones(n,1);
                 model.sense='>';
                 params.outputflag = 0;
                 results = gurobi(model,params);
                 x=results.x;
-                objective=0.5*trial_states{1,t-1}'*A*trial_states{1,t-1}+x'*C*trial_states{1,t-1}+0.5*x'*B*x+sampleXsi{1,t}(Index,1:n)*trial_states{1,t-1}+sampleXsi{1,t}(Index,n+1:2*n)*x;
-                delta=A*trial_states{1,t-1}+C'*x+sampleXsi{1,t}(j,n+1:2*n)';
+                objective=0.5*trial_states{1,t-1}'*A*trial_states{1,t-1}+x'*C*trial_states{1,t-1}+0.5*x'*B*x+sampleXsi{1,t}(j,1:n)*trial_states{1,t-1}+sampleXsi{1,t}(j,n+1:2*n)*x;
+                delta=A*trial_states{1,t-1}+C'*x+sampleXsi{1,t}(j,1:n)';
                 objective=objective-delta'*trial_states{1,t-1};
                 slope=slope+probabilities{1,t}(j)*delta;
                 intercept=intercept+probabilities{1,t}(j)*objective;
@@ -138,9 +138,9 @@ while End_Algo
             intercept=0;
             slope=zeros(n,1);
             for j=1:M
-                A=sampleXsi{1,t-1}(j,1:n)'*sampleXsi{1,t-1}(j,1:n)+lambda*eye(n);
-                B=sampleXsi{1,t-1}(j,n+1:2*n)'*sampleXsi{1,t-1}(j,n+1:2*n)+lambda*eye(n);
-                C=sampleXsi{1,t-1}(j,n+1:2*n)'*sampleXsi{1,t-1}(j,1:n);
+                A=sampleXsi{1,t}(j,1:n)'*sampleXsi{1,t}(j,1:n)+lambda*eye(n);
+                B=sampleXsi{1,t}(j,n+1:2*n)'*sampleXsi{1,t}(j,n+1:2*n)+lambda*eye(n);
+                C=sampleXsi{1,t}(j,n+1:2*n)'*sampleXsi{1,t}(j,1:n);
                 model.Q=sparse(([0.5*[zeros(1,n+1);[zeros(n,1),B]]]));
                 model.obj=[1;C*trial_states{1,t-1}+sampleXsi{1,t}(j,n+1:2*n)'];
                 model.rhs=[-1;1;alphas{1,t}];
@@ -152,7 +152,7 @@ while End_Algo
                     model.A(2+i,2:n+1)=-betas{1,t}(i,:);
                 end
                 model.lb=[-(10)^50;zeros(n,1)];
-                model.ub=[(10)^50;1*ones(n,1)];
+                model.ub=[(10)^50;ones(n,1)];
                 model.sense='>';
                 params.outputflag = 0;
                 results=gurobi(model,params);
@@ -162,8 +162,8 @@ while End_Algo
                 %gurobi_write(model,'model.lp');
                 %gurobi_iis(model,params);
                 x=results.x;
-                objective=x(1)+0.5*trial_states{1,t-1}'*A*trial_states{1,t-1}+x(2:n+1)'*C*trial_states{1,t-1}+0.5*x(2:n+1)'*B*x(2:n+1)+sampleXsi{1,t}(Index,1:n)*trial_states{1,t-1}+sampleXsi{1,t}(Index,n+1:2*n)*x(2:n+1);
-                delta=A*trial_states{1,t-1}+C'*x(2:n+1)+sampleXsi{1,t}(j,n+1:2*n)';
+                objective=x(1)+0.5*trial_states{1,t-1}'*A*trial_states{1,t-1}+x(2:n+1)'*C*trial_states{1,t-1}+0.5*x(2:n+1)'*B*x(2:n+1)+sampleXsi{1,t}(j,1:n)*trial_states{1,t-1}+sampleXsi{1,t}(j,n+1:2*n)*x(2:n+1);
+                delta=A*trial_states{1,t-1}+C'*x(2:n+1)+sampleXsi{1,t}(j,1:n)';
                 objective=objective-delta'*trial_states{1,t-1};
                 slope=slope+probabilities{1,t-1}(j)*delta;
                 intercept=intercept+probabilities{1,t-1}(j)*objective;
@@ -174,7 +174,7 @@ while End_Algo
     end
     time=[time;toc];
     if (iter>=200)
-    End_Algo=abs((zsup-zinf)/zsup)>tol;
+        End_Algo=abs((zsup-zinf)/zsup)>tol;
     end
     if (iter>=nb_iter_max)
         End_Algo=0;

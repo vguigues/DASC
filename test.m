@@ -2,10 +2,10 @@ cd 'C:\gurobi901\win64\matlab\'
 gurobi_setup
 addpath 'C:\Users\vince\Dropbox\Articles_Math\Vincent\Submitted\Decomp_Strongly_Convex_Value_Function';
 
-T=20;
-M=10;
-lambda=100;
-n=50;
+T=3;
+M=5;
+lambda=100000;
+n=200;
 sampleXsi=cell(1,T);
 for t=1:T
     sampleXsi{1,t}=zeros(M,2*n);
